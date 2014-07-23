@@ -1,0 +1,85 @@
+---
+title: "ARRYTHMIA STUDY"
+author: "Ivan Stankov, Kiril Mitchev, Aleksandar Gabrovski, Deian Atanassov"
+date: "Tuesday, July 22, 2014"
+output: html_document
+---
+
+First we need to load our dataset and format in proper way, so we can use it for further modeling.
+
+This loads our matrix of data in a variable called "data" and tells that if there is "?" it is NA value and each value is separated by "," and the decimal symbol is "." 
+```{r}
+#to load the data properly you must setwd("") where between "" is the path to the folder containing arrhythmia.data
+data=read.table("arrhythmia.data",header=F,na.string="?",sep=",", dec=".")
+#here we can asign the titles of each variable.
+summary(data)
+```
+Next we will need to manage the NA values. We see that in Var14 there are a lot of NA values. We will change the NA values of this variable with 
+the mean of the known values, so we can use it in our modeling. Other variant will be to completely remove it from our model.
+```{r}
+#the mean of the known values of V14
+v14_mean = mean(data$V14,na.rm=T)
+#now we replace the NA values with the mean stored in v14_mean
+data[is.na(data$V14),14]=v14_mean
+```
+Now we must look for other variables which have NA values and do the same. After this we are ready to proceed further.
+```{r}
+data[is.na(data$V11),11] = mean(data$V11,na.rm=T)
+data[is.na(data$V12),12] = mean(data$V12,na.rm=T)
+data[is.na(data$V11),13] = mean(data$V13,na.rm=T)
+data[is.na(data$V15),11] = mean(data$V15,na.rm=T)
+```
+Removing the variables with no variance and NAs
+```{r}
+library(caret)
+zeroVar=c(nearZeroVar(data))
+data=data[,-zeroVar]# removing the Variables with zero
+data$V14=NULL #removing the Variable with NAs
+```
+Now we plot some boxplots over data to briefly visualise it. 
+```{r}
+# there must be more rational way to do this!!!
+boxplot(data[1:20])
+boxplot(data[21:40])
+boxplot(data[41:60])
+boxplot(data[61:80])
+boxplot(data[81:100])
+boxplot(data[101:120])
+boxplot(data[121:140])
+boxplot(data[141:148])
+
+```
+V2 is Sex - we make it as.factor
+```{r}
+data$V2=as.factor(data$V2)
+```
+Box-Cox transformation (for the paper include formula on page 32)
+```{r}
+data1=preProcess(data[,-c(2,148)], method = "BoxCox")
+data11=predict(data1,data)
+```
+Creating dihotomous response variable
+1 for normal; 0 for diseased
+```{r}
+response=rep(0,nrow(data11))
+for (i in 1:length(response)){
+  if (data11$V280[i]==1){response[i]=1}
+  else {response[i]=0}
+}
+
+#data11 becomes data, and is without the last variable
+data11$V280=NULL
+data=data11
+remove(data11)
+
+
+
+
+
+
+
+
+
+
+
+
