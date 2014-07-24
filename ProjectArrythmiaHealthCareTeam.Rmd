@@ -26,8 +26,10 @@ Now we must look for other variables which have NA values and do the same. After
 ```{r}
 data[is.na(data$V11),11] = mean(data$V11,na.rm=T)
 data[is.na(data$V12),12] = mean(data$V12,na.rm=T)
-data[is.na(data$V11),13] = mean(data$V13,na.rm=T)
-data[is.na(data$V15),11] = mean(data$V15,na.rm=T)
+data[is.na(data$V13),13] = mean(data$V13,na.rm=T)
+data[is.na(data$V15),15] = mean(data$V15,na.rm=T)
+data[142,3]=mean(data$V3)
+data[317,3]=mean(data$V3)
 ```
 Removing the variables with no variance and NAs
 ```{r}
@@ -55,7 +57,7 @@ data$V2=as.factor(data$V2)
 ```
 Box-Cox transformation (for the paper include formula on page 32)
 ```{r}
-data1=preProcess(data[,-c(2,148)], method = "BoxCox")
+data1=preProcess(data[,-c(2,3,148)], method = "BoxCox")
 data11=predict(data1,data)
 ```
 Creating dihotomous response variable
@@ -71,11 +73,74 @@ for (i in 1:length(response)){
 data11$V280=NULL
 data=data11
 remove(data11)
+```
+data3=data
+
+
+# Determine number of clusters that minimizes the within-group distances
+
+wss <- (nrow(data3)-1)*sum(apply(data3,2,var))
+for (i in 2:20) wss[i] <- sum(kmeans(data3,
+   centers=i)$withinss)
+plot(1:20, wss, type="b", xlab="Number of Clusters",
+  ylab="Within groups sum of squares") 
+abline(h=min(wss))
+# K-Means Cluster Analysis
+
+# 16 cluster solution
+KM=kmeans(data3,16,nstart=20)
+
+# get cluster means
+aggregate(data3,by=list(KM$cluster),FUN=mean)
+
+# append cluster assignment
+data4=data.frame(data3,KM$cluster)
 
 
 
+PCA
+
+```{r}
+pca.data=data.frame(cbind(response,data))## must be dat frame
+### for the pca we need the varibles to be numeric, so we have removed the V2 variable
+pca.data$V2=NULL
+pr.out=prcomp(pca.data[,2:147],scale=TRUE) # scale standatizes the variables
+names(pr.out)
+pr.out$center# the means prior the standartization
+pr.out$scale# the sd prior the standartization
+pr.out$rotation# the pc loadings
 
 
+pr.var =pr.out$sdev ^2 # proportion of variance
+pve=pr.var/sum(pr.var )# % of variance explained
+par(mfrow=c(1,2))
+plot(pve , xlab=" Principal Component ", ylab=" PVE ", ylim=c(0,1) ,type="b",col="blue")
+ plot(cumsum (pve ), xlab=" Principal Component ", ylab ="
+Cumulative PVE ", ylim=c(0,1) ,col="blue",
+       type="b")
+par(mfrow=c(1,1))
+head(pr.out$x)
+
+### cost function for logit 
+cost <- function(lael,p){
+  mean(lael==ifelse(p > 0.5, 1, 0)) # if p >0.5 is classified as 1, else 0
+}
+
+library(boot)
+pca.cv.err=rep(0,146)# empty vector for the CV erros
+set.seed(100)
+for (i in 1:146) {
+pca.regression.data=data.frame(cbind(response,pr.out$x[,1:i])) # data set for PCA regression
+pca.fit=glm(response~.,data=pca.regression.data,   family=binomial)# PCA regression
+pca.cv.err[i] <- cv.glm(pca.regression.data, pca.fit, cost, K = 10)$delta[1] #10-fold cross validation
+cat(i," ")# this will show which i is computed in the moment
+}
+pca.cv.err
+max(pca.cv.err)# its actualy accuracy
+plot(pca.cv.err, xlab=" Number of Principal Components ",main=" Principal Components Regression", ylab ="
+Fraction of correct predictions", ylim=c(0.5,.8) ,
+     type="b")
+abline(h=max(pca.cv.err),col=3)
 
 
 
